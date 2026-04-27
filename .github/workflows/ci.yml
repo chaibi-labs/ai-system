@@ -29,8 +29,11 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - name: Install yq (for eval YAML parsing)
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq yq
+      - name: Install yq (mikefarah/yq — Go binary, not the Python wrapper from apt)
+        run: |
+          sudo wget -q -O /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
       - name: Run evaluations
         run: python3 evaluations/run_evals.py
         # The executor is currently stubbed, so all tasks land "skipped" — that's
