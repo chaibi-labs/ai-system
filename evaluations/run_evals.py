@@ -32,6 +32,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import urllib.error
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -43,9 +45,14 @@ REPORTS_DIR = REPO_ROOT / "evaluations" / "reports"
 HALT_FILE = Path("~/.ai-system/HALT").expanduser()
 
 DEFAULT_MODEL = "qwen2.5-coder:14b"
+OLLAMA_API_URL = "http://localhost:11434/api/generate"
 EXEC_TIMEOUT_SECONDS = 900       # 15 min per executor run
 ACCEPT_TIMEOUT_SECONDS = 300     # 5 min for the acceptance_check command
 RAW_OUTPUT_TRUNCATE = 4000       # cap raw output stored in the report
+
+# The model sometimes wraps its entire output in markdown code fences. Strip
+# outer ```...``` before parsing file blocks.
+OUTER_FENCE_RE = re.compile(r"\A\s*```[a-zA-Z]*\s*\n(.*)\n```\s*\Z", re.DOTALL)
 
 FILE_BLOCK_RE = re.compile(
     r"===\s*BEGIN FILE:\s*(?P<path>.+?)\s*===\s*\n(?P<body>.*?)===\s*END FILE:\s*(?P=path)\s*===",
@@ -167,8 +174,15 @@ BLOCKED: <one specific question or contradiction>
 """
 
 
+def strip_outer_fence(text: str) -> str:
+    """If the entire output is wrapped in ```...```, strip the outer fence."""
+    m = OUTER_FENCE_RE.match(text)
+    return m.group(1) if m else text
+
+
 def parse_and_apply_output(output: str, fixture_dir: Path) -> dict:
     """Parse model output, write the file blocks into fixture_dir, return status."""
+    output = strip_outer_fence(output)
     files_written: list[str] = []
     seen: set[str] = set()
     for m in FILE_BLOCK_RE.finditer(output):
@@ -185,7 +199,11 @@ def parse_and_apply_output(output: str, fixture_dir: Path) -> dict:
         files_written.append(rel)
 
     status_match = STATUS_RE.search(output)
-    status = status_match.group("status").strip() if status_match else "MISSING_STATUS"
+    if status_match:
+        # The capture may pick up trailing backticks if the model fenced its output.
+        status = status_match.group("status").strip().rstrip("`").strip()
+    else:
+        status = "MISSING_STATUS"
 
     return {"files_written": files_written, "status": status}
 
@@ -254,36 +272,43 @@ def execute_stub(task_spec: dict, fixture_dir: Path) -> dict:
     }
 
 
+def call_ollama_api(model: str, prompt: str, timeout: int) -> tuple[str, str | None]:
+    """Call Ollama HTTP API. Returns (response_text, error_or_None).
+
+    Using the API gives us clean text output without the ANSI/cursor-control
+    codes the `ollama run` CLI emits for its streaming UI even when stdin is
+    piped.
+    """
+    payload = json.dumps({"model": model, "prompt": prompt, "stream": False}).encode()
+    req = urllib.request.Request(
+        OLLAMA_API_URL, data=payload, headers={"Content-Type": "application/json"}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = json.loads(resp.read().decode())
+    except urllib.error.URLError as exc:
+        return "", f"ollama API URLError: {exc}"
+    except TimeoutError:
+        return "", f"ollama API timeout after {timeout}s"
+    except json.JSONDecodeError as exc:
+        return "", f"ollama API returned non-JSON: {exc}"
+    if "response" not in body:
+        return "", f"ollama API response missing 'response' key: {body}"
+    return body["response"], None
+
+
 def execute_real(task_spec: dict, expected: dict, fixture_dir: Path, model: str) -> dict:
     prompt = build_executor_prompt(task_spec, fixture_dir)
 
-    try:
-        proc = subprocess.run(
-            ["ollama", "run", model],
-            input=prompt,
-            capture_output=True,
-            text=True,
-            timeout=EXEC_TIMEOUT_SECONDS,
-        )
-    except subprocess.TimeoutExpired:
-        return {
-            "executed": True,
-            "executor_status": "timeout",
-            "verdict": "fail",
-            "model": model,
-            "note": f"ollama run timed out after {EXEC_TIMEOUT_SECONDS}s",
-        }
-
-    if proc.returncode != 0:
+    raw, err = call_ollama_api(model, prompt, EXEC_TIMEOUT_SECONDS)
+    if err:
         return {
             "executed": True,
             "executor_status": "ollama_error",
             "verdict": "fail",
             "model": model,
-            "stderr_tail": proc.stderr[-500:],
+            "error": err,
         }
-
-    raw = proc.stdout
     applied = parse_and_apply_output(raw, fixture_dir)
     accept = run_acceptance(task_spec, fixture_dir)
     val = validate(expected, applied, accept)
