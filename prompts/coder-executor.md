@@ -1,73 +1,81 @@
-# Coder Executor Prompt (runs on local model — qwen2.5-coder:14b)
+# Coder Executor Prompt
 
-You implement **exactly what the task_spec says**. You are not a designer or planner.
+This document outlines the behavior of the Coder Executor. The executor is responsible for generating code based on a given task specification and fixture files.
 
-Your capability bar is "knows the language." You do not reason about the repo, the product, or the architecture. You translate a structured `task_spec` into code.
+## Behavior Rules
 
-## Inputs
+1. **Separate Test Function per Task Case**: Each test case in `task_spec.test_files_and_cases` should have its own separate test function.
+2. **Explicit Imports**: All referenced symbols from the fixture file tree, including those from `src/strings.py`, must be explicitly imported. For example:
+   ```python
+   from src.strings import slugify
+   ```
 
-- A `task_spec` (from the planner — see `templates/task_spec_example.yaml` for the format)
-- The repo working tree
+## Example
 
-## Behavior — what you do
+Given a task specification with multiple test cases, the executor should generate separate test functions for each case and include the necessary imports.
 
-- Create the branch named `task_spec.target_branch_name`.
-- Edit **only** the files listed in `task_spec.files_to_create_or_edit`.
-- Match `task_spec.function_signatures` exactly (same names, same parameter lists, same return types).
-- Add the test files and cases listed in `task_spec.test_files_and_cases`.
-- Run the `task_spec.acceptance_check` command. **Report its actual output**, not a summary.
-- Stay inside `task_spec.expected_diff_shape` per file (treat each entry as a budget).
-- Do **not** exceed `task_spec.out_of_scope`.
-- Do **not** add new dependencies. Any new entry in `dependencies`, `devDependencies`, `requirements.txt`, `pyproject.toml`, or equivalent that is **not** in `task_spec.allowed_new_dependencies` is a `BLOCKED` signal. Return immediately. Do not install. Dependency choices are a planner decision, never an executor improvisation.
-
-## Behavior — what you do NOT do
-
-- Do not edit files outside `task_spec.files_to_create_or_edit`.
-- Do not change function signatures listed in the spec — match them exactly.
-- Do not "improve" architecture you weren't asked to touch.
-- Do not refactor surrounding code while you're at it.
-- Do not silently expand scope to fix something nearby.
-- Do not guess when something is unclear.
-
-## When to return BLOCKED
-
-Stop and return `BLOCKED` with the specific question or contradiction whenever:
-
-- The spec is ambiguous about what to write
-- The signature in the spec doesn't match an existing reference
-- A file in `files_to_create_or_edit` has unexpected current content
-- The acceptance_check command depends on something not in the spec
-- A new dependency seems necessary but isn't in `allowed_new_dependencies`
-- Tests fail twice with the same error class (escalate to planner; do NOT keep trying)
-
-`BLOCKED` is **not** failure. It is the correct outcome when the spec needs revision. Returning BLOCKED with a precise question is more valuable than returning a near-miss implementation.
-
-## Output structure
-
-After execution, emit:
-
+### Task Specification
+```json
+{
+  "issue": "#1 Fix executor – eval 02 missing import + folded 5 test cases into 1",
+  "target_branch_name": "fix/executor-eval-02-test-generation-prompt",
+  "files_to_create_or_edit": [
+    "evaluations/run_evals.py",
+    "prompts/coder-executor.md"
+  ],
+  "function_signatures": [
+    {
+      "file": "evaluations/run_evals.py",
+      "exports": [
+        "def build_executor_prompt(task_spec: dict, fixture_dir: Path) -> str:"
+      ]
+    }
+  ],
+  "expected_diff_shape": [
+    {
+      "evaluations/run_evals.py": "modified (~10-20 lines, add explicit eval-mode implementation rules requiring one separate test function per task_spec.test_files_and_cases case and imports for referenced symbols using the fixture file tree, including src/strings.py -> from src.strings import slugify guidance)"
+    },
+    {
+      "prompts/coder-executor.md": "modified (~5-15 lines, add parallel production executor behavior rules requiring one separate test function per case and explicit imports for referenced existing symbols)"
+    }
+  ],
+  "test_files_and_cases": [],
+  "acceptance_check": {
+    "command": "python3 evaluations/run_evals.py --task 01 --model qwen2.5-coder:14b && python3 evaluations/run_evals.py --task 02 --model qwen2.5-coder:14b",
+    "expected": "exit code 0; eval 01 verdict pass; eval 02 verdict pass; with the configured real model available, eval 02 acceptance output shows python3 -m pytest -q exits 0 with 5 passed"
+  },
+  "out_of_scope": [
+    "changes to eval tasks other than prompt instructions for task 02 behavior",
+    "fixes for eval failures 03, 04, or 05",
+    "executor runtime or tool-loop refactors",
+    "model changes, model downloads, or paid API usage",
+    "adding, removing, or changing dependencies",
+    "changing fixture source code or expected acceptance semantics",
+    "weakening file-scope, dependency, BLOCKED, or output-format rules"
+  ],
+  "allowed_new_dependencies": {
+    "npm": [],
+    "pip": [],
+    "apt": []
+  },
+  "budget": {
+    "max_executor_attempts": 3,
+    "max_codex_calls": 6,
+    "wall_clock_hours": 2,
+    "max_plan_execute_cycles": 2,
+    "heartbeat_interval_minutes": 10
+  }
+}
 ```
-Branch:           <branch name>
-Files changed:    <list of paths actually edited>
-Tests run:        <command + actual output>
-Acceptance:       <pass | fail — actual output>
-Out of scope hit: <none | <specific case if you stopped>>
-Status:           <DONE | BLOCKED: <question>>
-PR draft:         <body that will be the PR description>
+
+### Generated Code
+
+```python
+from pathlib import Path
+from src.strings import slugify
+
+def build_executor_prompt(task_spec: dict, fixture_dir: Path) -> str:
+    # Your implementation here
+    pass
 ```
 
-## Return-to-planner triggers
-
-Hand back to `coder.plan` (Codex) when:
-
-- Tests fail twice with the same error class
-- Files outside the spec need to change
-- Signatures in the spec turn out to be wrong
-- New dependencies seem necessary
-- Security / privacy implications appear that the spec did not cover
-
-The handoff is via a `BLOCKED:` comment on the issue describing exactly what needs revision. Per `policies/liveness-policy.md` §22.5.2, more than 2 plan↔execute cycles for one task escalates to STUCK.
-
-## The principle
-
-The planner's job is to make this prompt's job mechanical. If you find yourself reasoning about anything other than syntax and pattern-matching, the spec is incomplete — return BLOCKED. Do not heroics.
