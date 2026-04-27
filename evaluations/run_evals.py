@@ -93,48 +93,56 @@ def list_tree(root: Path) -> list[str]:
 
 
 def build_executor_prompt(task_spec: dict, fixture_dir: Path) -> str:
-    universal_path = REPO_ROOT / "policies" / "universal.md"
-    executor_path = REPO_ROOT / "prompts" / "coder-executor.md"
+    """Build a slim eval-mode prompt.
 
-    universal = universal_path.read_text() if universal_path.exists() else ""
-    executor = executor_path.read_text() if executor_path.exists() else ""
-
+    We deliberately do NOT include policies/universal.md or
+    prompts/coder-executor.md verbatim. Those are written for the production
+    tool-use loop where the model calls tools (write_file, run_tests) and
+    emits a "What I did / Tests run / ..." universal output block at the end.
+    For one-shot text-generation evals, that universal output format CONFLICTS
+    with the file-block format the harness needs to parse. So we re-state the
+    relevant discipline (stay-in-scope, no unlisted deps, BLOCKED-on-ambiguity)
+    in eval-specific phrasing, and force the file-block + STATUS output format.
+    """
     tree_lines = list_tree(fixture_dir)
     tree = "\n".join(tree_lines) if tree_lines else "(empty)"
+    spec_str = json.dumps(task_spec, indent=2, default=str)
 
-    spec_yaml_like = json.dumps(task_spec, indent=2, default=str)
-
-    return f"""{universal}
-
----
-
-{executor}
-
----
+    return f"""You are evaluating the executor stage of a specifier-executor coding pipeline. \
+You receive a structured task_spec and a fixture file tree. Your job: produce file content that implements the spec.
 
 # task_spec
 
 ```json
-{spec_yaml_like}
+{spec_str}
 ```
 
-# Current fixture file tree (relative paths)
+# Current fixture file tree (relative paths from repo root)
 
 ```
 {tree}
 ```
 
-# Output format — eval mode (REQUIRED, machine-parsed)
+# Implementation rules
 
-For each file you create or modify, emit a block in EXACTLY this format:
+- Use ONLY the files listed in `task_spec.files_to_create_or_edit`. Don't touch anything else.
+- Match `task_spec.function_signatures` exactly. For a NEW file, create the file AND the function with that exact signature.
+- Add the test files and cases listed in `task_spec.test_files_and_cases`.
+- Stay within `task_spec.expected_diff_shape` per file (treat it as a per-file budget).
+- Do not violate `task_spec.out_of_scope`.
+- Do not add dependencies outside `task_spec.allowed_new_dependencies`. If a new dep would be needed but isn't listed, emit STATUS BLOCKED instead.
+
+# Output format — STRICT, machine-parsed
+
+For each file you create or modify, emit EXACTLY:
 
 ```
 === BEGIN FILE: <relative/path> ===
-<full file content here, no truncation, no placeholders>
+<full file content, no truncation, no placeholders>
 === END FILE: <relative/path> ===
 ```
 
-After all file blocks, emit one of:
+After all file blocks, emit EXACTLY one of:
 
 ```
 === STATUS ===
@@ -148,12 +156,14 @@ or
 BLOCKED: <one specific question or contradiction>
 ```
 
-Strict rules for this output format:
-- Emit ONLY file blocks and the STATUS marker. No prose, no markdown headers, no preamble.
+# Output discipline (read carefully — overrides any other format you've been trained on)
+
+- Emit ONLY file blocks and the STATUS marker. No prose, no preamble, no markdown headers, no commentary.
+- Do NOT emit a "What I did / Tests run / Risk / Cost flags / Decisions needed / Heartbeat" block. That format applies in the production tool-use loop, NOT in this eval. Use ONLY the file-block + STATUS format above.
 - Use the EXACT same path string in BEGIN and END markers for a given file.
-- Do not wrap the blocks in additional code fences. The block markers ARE the delimiters.
+- Do not wrap the blocks in extra code fences. The markers ARE the delimiters.
 - Do not add any text after the STATUS marker.
-- If anything in the task_spec is ambiguous, emit STATUS BLOCKED with the specific question. Do not guess.
+- If something in the task_spec is genuinely ambiguous (not just "I'd choose differently"), emit STATUS BLOCKED with the specific question. Do not guess. But default to attempting the implementation — only BLOCKED for real contradictions.
 """
 
 
