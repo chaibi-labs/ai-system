@@ -54,7 +54,7 @@ task_spec:
         - "renders computed kcal (grams * kcalPerGram)"
 
   acceptance_check:
-    command: "pnpm install --frozen-lockfile && pnpm test && pnpm tsc"
+    command: "pnpm install --silent && pnpm test && pnpm tsc"
     expected: "exit code 0; 3 tests pass; no type errors"
 
   out_of_scope:
