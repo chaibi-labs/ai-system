@@ -26,8 +26,14 @@ if [[ ! -f "$ROOT/secrets/.env" ]]; then
 # ~/.ai-system/secrets/.env
 # Personal AI Dev Studio secrets. Never committed. chmod 600.
 #
+# Loaded by systemd at OpenClaw daemon start via the drop-in at
+# ~/.config/systemd/user/openclaw-gateway.service.d/secrets.conf.
+# Agents NEVER read this file directly — they inherit env vars from
+# the daemon's process tree (see policies/security-policy.md).
+#
 # Required at MVP — and only these:
 GITHUB_TOKEN=
+GH_TOKEN=
 GITHUB_USERNAME=DasGewuerz
 
 # Codex authenticates via ChatGPT login (subscription), not API key.
@@ -35,7 +41,7 @@ GITHUB_USERNAME=DasGewuerz
 # policies/cost-policy.md — leave it absent.
 EOF
   chmod 600 "$ROOT/secrets/.env"
-  echo "Created $ROOT/secrets/.env (fill in GITHUB_TOKEN)"
+  echo "Created $ROOT/secrets/.env (fill in GITHUB_TOKEN; mirror to GH_TOKEN)"
 fi
 
 if [[ ! -f "$ROOT/codex_sessions.log" ]]; then

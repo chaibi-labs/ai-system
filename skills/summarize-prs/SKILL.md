@@ -16,7 +16,10 @@ Trigger: `/summarize-prs` (no args) or `/summarize-prs <repo>` to scope to one r
 
 ```bash
 [[ -f /home/anis/.ai-system/HALT ]] && { echo "HALTED"; exit 0; }
-export $(grep -v '^#' /home/anis/.ai-system/secrets/.env | xargs)
+# GH_TOKEN/GITHUB_TOKEN are injected by systemd from ~/.ai-system/secrets/.env
+# at OpenClaw daemon start (see ~/.config/systemd/user/openclaw-gateway.service.d/
+# secrets.conf). Agents inherit them via the process tree — no agent reads the
+# secrets file directly, honoring policies/security-policy.md.
 ```
 
 For each open PR across all `chaibi-labs/*` repos (or just one if scoped):

@@ -29,6 +29,16 @@ Secrets live **outside** any repo, owned by the user only:
 ~/.ai-system/secrets/codex/     # Codex CLI session cache
 ```
 
+**Agents never read this file.** Instead, systemd loads it once at OpenClaw daemon start via a drop-in:
+
+```
+~/.config/systemd/user/openclaw-gateway.service.d/secrets.conf
+  [Service]
+  EnvironmentFile=-/home/anis/.ai-system/secrets/.env
+```
+
+The daemon's child processes (skills, scripts, tools) inherit `GH_TOKEN`, `GITHUB_TOKEN`, etc. through the process tree. This honors the agent-forbidden-paths rule below — no agent ever reads `~/.ai-system/secrets/` directly. Skill bodies must NOT contain `source ~/.ai-system/secrets/.env` or equivalent; if they do, an agent that takes its policies seriously (correctly) refuses to execute them.
+
 Required at MVP — and only these:
 
 ```

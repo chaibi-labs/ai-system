@@ -35,7 +35,10 @@ issues:
 
 ```bash
 [[ -f /home/anis/.ai-system/HALT ]] && { echo "HALTED"; exit 0; }
-export $(grep -v '^#' /home/anis/.ai-system/secrets/.env | xargs)
+# GH_TOKEN/GITHUB_TOKEN are injected by systemd from ~/.ai-system/secrets/.env
+# at OpenClaw daemon start (see ~/.config/systemd/user/openclaw-gateway.service.d/
+# secrets.conf). Agents inherit them via the process tree — no agent reads the
+# secrets file directly, honoring policies/security-policy.md.
 cd /home/anis/src/ai-system
 git pull --ff-only
 python3 scripts/create_issue_batch.py <manifest-path>

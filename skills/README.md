@@ -14,6 +14,7 @@ These are versioned here in `ai-system/` and registered with OpenClaw via `skill
 | `/repo-health`       | Verify ai-system layout (`scripts/repo_health.py`)                        |
 | `/create-issues`     | Batch-create issues from a YAML/JSON manifest                             |
 | `/summarize-prs`     | Open-PR overview across all `chaibi-labs/*` repos                         |
+| `/execute`           | Coder executor — run local model on a `task_spec`, run tests, open PR     |
 | `/liveness-status`   | Real-time anti-stall view: STUCK, quota, decision gates, cascade halts    |
 
 ## Forbidden (not registered as skills, intentionally)
@@ -50,5 +51,6 @@ All skills here pre-flight with the same discipline:
 
 - Check `~/.ai-system/HALT` (kill switch — `policies/liveness-policy.md` §22.5.9)
 - Check `~/.ai-system/quota_state.json` (quota-aware degradation — §22.5.4)
-- Source `~/.ai-system/secrets/.env` for `GH_TOKEN`
 - `cd ~/src/ai-system && git pull --ff-only` so the skill always runs against current `main`
+
+`GH_TOKEN` / `GITHUB_TOKEN` are **not sourced from `.env` by the skill** — that would violate `policies/security-policy.md` (no agent reads `~/.ai-system/secrets/`). Instead, systemd loads the env file at OpenClaw daemon start (`~/.config/systemd/user/openclaw-gateway.service.d/secrets.conf`) and the daemon's child processes inherit them through the process tree. The agent never touches the secret file.

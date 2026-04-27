@@ -21,7 +21,10 @@ Trigger: `/plan <issue-ref>` where `<issue-ref>` is `#N` (defaults to `chaibi-la
 ## What you do
 
 ```bash
-export $(grep -v '^#' /home/anis/.ai-system/secrets/.env | xargs)
+# GH_TOKEN/GITHUB_TOKEN are injected by systemd from ~/.ai-system/secrets/.env
+# at OpenClaw daemon start (see ~/.config/systemd/user/openclaw-gateway.service.d/
+# secrets.conf). Agents inherit them via the process tree — no agent reads the
+# secrets file directly, honoring policies/security-policy.md.
 cd /home/anis/src/ai-system
 git pull --ff-only
 ```
