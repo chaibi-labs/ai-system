@@ -15,6 +15,9 @@ Your capability bar is "knows the language." You do not reason about the repo, t
 - Edit **only** the files listed in `task_spec.files_to_create_or_edit`.
 - Match `task_spec.function_signatures` exactly (same names, same parameter lists, same return types).
 - Add the test files and cases listed in `task_spec.test_files_and_cases`.
+- Create one separate `def test_*()` function for each item in every `task_spec.test_files_and_cases[].cases`; never bundle multiple cases into one test.
+- Import symbols referenced by tests from existing fixture/source files, for example `from src.strings import slugify` when testing `slugify` from `src/strings.py`.
+- Do not put markdown code fences inside generated file content. File content must start with real source code, not ```python or similar.
 - Run the `task_spec.acceptance_check` command. **Report its actual output**, not a summary.
 - Stay inside `task_spec.expected_diff_shape` per file (treat each entry as a budget).
 - Do **not** exceed `task_spec.out_of_scope`.

@@ -99,6 +99,18 @@ def list_tree(root: Path) -> list[str]:
     return files
 
 
+def read_fixture_contents(root: Path, rel_paths: list[str]) -> str:
+    blocks = []
+    for rel in rel_paths:
+        path = root / rel
+        try:
+            content = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            content = "<binary file omitted>"
+        blocks.append(f"=== BEGIN EXISTING FILE: {rel} ===\n{content}\n=== END EXISTING FILE: {rel} ===")
+    return "\n\n".join(blocks) if blocks else "(empty)"
+
+
 def build_executor_prompt(task_spec: dict, fixture_dir: Path) -> str:
     """Build a slim eval-mode prompt.
 
@@ -113,6 +125,7 @@ def build_executor_prompt(task_spec: dict, fixture_dir: Path) -> str:
     """
     tree_lines = list_tree(fixture_dir)
     tree = "\n".join(tree_lines) if tree_lines else "(empty)"
+    fixture_contents = read_fixture_contents(fixture_dir, tree_lines)
     spec_str = json.dumps(task_spec, indent=2, default=str)
 
     return f"""You are evaluating the executor stage of a specifier-executor coding pipeline. \
@@ -130,11 +143,20 @@ You receive a structured task_spec and a fixture file tree. Your job: produce fi
 {tree}
 ```
 
+# Current fixture file contents
+
+```
+{fixture_contents}
+```
+
 # Implementation rules
 
+- Use existing fixture file contents as the source of truth for expected behavior.
 - Use ONLY the files listed in `task_spec.files_to_create_or_edit`. Don't touch anything else.
 - Match `task_spec.function_signatures` exactly. For a NEW file, create the file AND the function with that exact signature.
 - Add the test files and cases listed in `task_spec.test_files_and_cases`.
+- Create one separate `def test_*()` function for each item in every `task_spec.test_files_and_cases[].cases`; never bundle multiple cases into one test.
+- Import symbols referenced by tests from existing fixture/source files, for example `from src.strings import slugify` when testing `slugify` from `src/strings.py`.
 - Stay within `task_spec.expected_diff_shape` per file (treat it as a per-file budget).
 - Do not violate `task_spec.out_of_scope`.
 - Do not add dependencies outside `task_spec.allowed_new_dependencies`. If a new dep would be needed but isn't listed, emit STATUS BLOCKED instead.
@@ -169,6 +191,7 @@ BLOCKED: <one specific question or contradiction>
 - Do NOT emit a "What I did / Tests run / Risk / Cost flags / Decisions needed / Heartbeat" block. That format applies in the production tool-use loop, NOT in this eval. Use ONLY the file-block + STATUS format above.
 - Use the EXACT same path string in BEGIN and END markers for a given file.
 - Do not wrap the blocks in extra code fences. The markers ARE the delimiters.
+- Do not put markdown code fences inside file content. File content must start with real source code, not ```python or similar.
 - Do not add any text after the STATUS marker.
 - If something in the task_spec is genuinely ambiguous (not just "I'd choose differently"), emit STATUS BLOCKED with the specific question. Do not guess. But default to attempting the implementation — only BLOCKED for real contradictions.
 """
