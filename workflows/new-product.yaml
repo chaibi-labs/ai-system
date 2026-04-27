@@ -1,0 +1,53 @@
+name: new-product
+description: Kicks off when Anis brings a new product idea to the studio.
+trigger: "Anis proposes a product idea"
+
+steps:
+  - agent: pm
+    task: ask the 8 product-intake questions in a single comment; wait for Anis's answers
+    output: clarified product brief inputs
+
+  - agent: pm
+    task: produce templates/product_brief.md content as products/<name>/brief.md
+    output: product brief draft
+
+  - agent: design
+    task: ask the 8 design-intake questions in a single comment; wait for Anis's answers
+    output: clarified design direction
+
+  - agent: design
+    task: produce design brief at products/<name>/design.md (screens, components, tokens, animation spec)
+    output: design brief
+
+  - agent: architect
+    task: propose stack (default: per policies/mobile-policy.md or web defaults), document trade-offs
+    output: ADR-NNNN (status Proposed) and risk list
+
+  # Anis approval gate before any repo creation or code
+  - manual: anis_approve
+    on: product brief + design brief + ADR(s)
+
+  - agent: pm
+    task: convert MVP scope to first 10 GitHub issues, ordered by dependency
+    output: 10 issues in Inbox with full custom fields
+
+  - agent: ops
+    task: scaffold the product repo via scripts/start_product.py (creates repo, AGENTS.md, CI, branch protection if applicable)
+    output: empty product repo on GitHub
+
+  - agent: pm
+    task: move first issue to Spec Needed; transition the rest as dependencies clear
+
+decision_gates:
+  - app name
+  - stack with cost / privacy implications
+  - any paid service
+  - publishing target (TestFlight / App Store / side-load / web)
+  - branding / visual identity
+
+outputs:
+  - products/<name>/brief.md
+  - products/<name>/design.md
+  - decisions/ADR-NNNN-<topic>.md
+  - <product-repo> on GitHub
+  - 10 issues in the Project board

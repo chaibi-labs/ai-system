@@ -1,0 +1,62 @@
+name: figma-to-website
+description: Translates a Figma file or screenshots into a Next.js + Tailwind + Framer Motion implementation.
+trigger: "Anis provides a Figma file or screenshots"
+
+default_stack:
+  framework: Next.js (app router)
+  language: TypeScript
+  styling: Tailwind CSS
+  motion: Framer Motion
+  components: shadcn/ui where helpful
+
+steps:
+  - agent: design
+    task: extract sections / components / animation notes from Figma; produce a component backlog
+    output: design brief with screens + component prop signatures
+
+  - agent: design
+    task: ask Anis about visual interpretation choices (where Figma is ambiguous) and animation intensity
+    output: clarified design contract
+
+  - agent: pm
+    task: turn the component backlog into GitHub issues (one issue per section/component)
+    output: issues in Inbox with `type:design` label
+
+  - agent: architect
+    task: choose Next.js folder structure, layout strategy, image handling, font strategy (no paid fonts)
+    output: ADR-NNNN
+
+  # Anis approval before any code
+  - manual: anis_approve
+    on: design brief + ADR
+
+  - agent: coder.plan
+    task: per issue, produce task_spec
+    output: task_spec per issue
+
+  - agent: coder.execute
+    task: implement components and pages per spec
+    rule: "no paid fonts, icons, or assets without approval — BLOCKED if needed"
+
+  - agent: qa
+    task: check responsive behavior at common breakpoints; check basic accessibility (alt text, color contrast, keyboard nav)
+    output: test report + screenshots
+
+  - agent: reviewer
+    task: review code AND visual mapping (does the implementation reflect the design?)
+
+  - manual: anis_merge
+
+decision_gates:
+  - visual style interpretation (where Figma is ambiguous)
+  - paid fonts / assets
+  - animation intensity (none / subtle / moderate / heavy)
+  - mobile vs desktop priority
+  - launch domain (cost-gated)
+  - hosting choice (cost-gated)
+
+outputs:
+  - component backlog
+  - Next.js implementation
+  - screenshots in PRs
+  - merged PRs per component

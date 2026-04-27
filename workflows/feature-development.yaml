@@ -1,0 +1,57 @@
+name: feature-development
+description: Standard pipeline for any issue moving from Ready to Done. Uses the two-stage planner+executor pattern.
+trigger: "Issue moved to Ready"
+
+steps:
+  - agent: coder.plan          # Codex
+    task: produce task_spec from the issue (templates/task_spec_example.yaml format)
+    output: task_spec attached to the issue
+    gate: |
+      task_spec must contain:
+      - target_branch_name
+      - files_to_create_or_edit (exact paths)
+      - function_signatures (quotable)
+      - expected_diff_shape
+      - test_files_and_cases
+      - acceptance_check
+      - out_of_scope
+      - allowed_new_dependencies (mandatory if touching a manifest)
+      - budget
+
+  - agent: coder.execute       # local model
+    task: create feature branch and implement against task_spec
+    on_blocked: return to coder.plan with the BLOCKED reason
+    rule: "More than 2 plan↔execute cycles = STUCK (per liveness §22.5.2)"
+
+  - agent: qa
+    task: validate task_spec.acceptance_check passes; add edge-case tests as needed
+    on_failure: open bug issue with reproduction; do not fix in this PR
+
+  - agent: coder.execute
+    task: run final local checks; produce PR draft
+    output: PR draft body with task_spec attached
+
+  - agent: reviewer
+    task: review diff against task_spec; verify no scope creep, no unlisted deps, cost flags accurate
+    output: review verdict (approve | request changes | comment-only)
+
+  - agent: coder.execute
+    task: address reviewer's blockers (if any) → loop back to QA → reviewer until approved
+    output: approved PR
+
+  - manual: anis_merge          # Anis merges manually unless auto-merge is enabled per class
+    on: approved PR with green CI
+
+decision_gates:
+  - unclear user behavior  → coder.plan asks Anis BEFORE emitting spec (task stays in Spec Needed)
+  - cost
+  - external service
+  - large architecture change → cannot be one spec; decompose into multiple
+
+outputs:
+  - task_spec (archived in PR description)
+  - branch
+  - commits
+  - test report (actual command output)
+  - merged PR
+  - issue closed

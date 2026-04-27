@@ -1,0 +1,11 @@
+{
+  "files_created":  ["src/components/MacroChip.tsx", "src/components/__tests__/MacroChip.test.tsx"],
+  "files_modified": [],
+  "tests_added":    ["renders the label", "renders grams with 'g' suffix", "renders computed kcal (grams * kcalPerGram)"],
+  "acceptance":     "pass",
+  "test_pass_count": 3,
+  "tsc_clean": true,
+  "diff_lines_max": 80,
+  "must_not_modify": ["package.json", "tsconfig.json"],
+  "must_not_add_deps": true
+}

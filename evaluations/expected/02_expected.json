@@ -1,0 +1,9 @@
+{
+  "files_created":  ["tests/test_strings.py"],
+  "files_modified": [],
+  "tests_added":    ["lowercases input", "replaces spaces with hyphens", "collapses runs of non-alphanum into single hyphen", "strips leading and trailing hyphens", "empty string returns empty string"],
+  "acceptance":     "pass",
+  "test_pass_count": 5,
+  "diff_lines_max": 50,
+  "must_not_modify": ["src/strings.py"]
+}

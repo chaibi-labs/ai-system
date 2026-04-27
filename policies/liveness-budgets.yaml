@@ -1,0 +1,39 @@
+# liveness-budgets.yaml — default per-task budgets enforced by the orchestrator
+# Referenced by policies/liveness-policy.md §22.5.1
+
+# Per-task defaults
+defaults:
+  max_plan_attempts: 2            # coder.plan → coder.execute round-trips before escalation
+  max_executor_attempts: 3        # local executor runs per spec before re-plan
+  max_codex_calls_per_task: 8     # hard cap; protects subscription quota
+  max_wall_clock_hours: 4         # max time in "In Progress" without a progress event
+  heartbeat_interval_minutes: 10  # an active agent must emit a progress event within this window
+
+# A task can request a larger budget at planning time, but the request is a
+# decision gate (Anis must approve via comment).
+overrides_allowed: true
+override_requires_anis_approval: true
+
+# Quota state thresholds (driven by scripts/codex_quota_probe.py)
+quota_states:
+  green:
+    threshold_remaining_pct: 50
+    behavior: normal
+  yellow:
+    threshold_remaining_pct: 20
+    behavior: critical_path_only
+  red:
+    threshold_remaining_pct: 5
+    behavior: planner_draft_only       # no executor runs kicked off
+  exhausted:
+    threshold_remaining_pct: 0
+    behavior: report_only
+
+# Per-class budget overrides (optional)
+class_overrides:
+  nightly:
+    max_codex_calls_per_task: 1        # nightly is conservative on Codex
+    heartbeat_interval_minutes: 30
+  evaluation:                          # eval harness runs
+    max_executor_attempts: 1
+    heartbeat_interval_minutes: 5

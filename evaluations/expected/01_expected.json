@@ -1,0 +1,8 @@
+{
+  "files_created":  ["src/math_utils.py", "tests/test_math_utils.py"],
+  "files_modified": [],
+  "tests_added":    ["zeros yield zero kcal", "1g protein + 1g carb + 1g fat yields 4+4+9 = 17 kcal", "negative inputs raise ValueError"],
+  "acceptance":     "pass",
+  "test_pass_count": 3,
+  "diff_lines_max": 60
+}

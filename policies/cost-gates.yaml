@@ -1,0 +1,41 @@
+# cost-gates.yaml — machine-readable cost firewall (referenced by §22 of source plan)
+#
+# The orchestrator checks every proposed action against this file before
+# execution. Categories: always_allowed, ask_first, never_without_explicit_approval.
+
+always_allowed:
+  - local_ollama
+  - local_docker
+  - local_postgres
+  - local_redis
+  - github_free_features_within_quota
+  - chatgpt_subscription_usage_within_existing_plan
+  - public_repo_actions_minutes_within_free_quota
+
+ask_first:
+  - codex_long_task                    # > 30 min wall clock
+  - codex_parallel_agents              # multiple Codex sessions concurrently
+  - codex_cloud_delegation
+  - github_actions_heavy_usage         # > 50% of free monthly quota
+  - expo_eas_build
+  - apple_developer_program            # $99/year
+  - domain_purchase
+  - hosted_database
+  - hosted_backend
+  - auth_provider                      # if paid tier
+  - analytics_provider
+  - paid_figma_assets
+  - paid_icons
+  - paid_fonts
+  - paid_food_database_api
+  - paid_template_purchase
+
+never_without_explicit_approval:
+  - pay_per_request_llm_api            # any *_API_KEY for usage-based billing
+  - usage_based_ai_api
+  - production_deployment              # anything user-facing
+  - app_store_submission
+  - play_store_submission
+  - testflight_distribution
+  - recurring_subscription
+  - entering_payment_method

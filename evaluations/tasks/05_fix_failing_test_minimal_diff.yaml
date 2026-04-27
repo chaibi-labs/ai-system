@@ -1,0 +1,59 @@
+# Eval 05 — fix a failing test with the minimal diff.
+# Covers: bug fix discipline (smallest change that makes the failing test pass).
+
+fixture:
+  language: python
+  starter:
+    "src/__init__.py": ""
+    "src/cart.py": |
+      def total(items: list[dict]) -> float:
+          # BUG: doesn't sum, just returns first item's price
+          return items[0]["price"]
+    "tests/__init__.py": ""
+    "tests/test_cart.py": |
+      from src.cart import total
+
+      def test_empty_cart():
+          assert total([]) == 0
+
+      def test_single_item():
+          assert total([{"price": 5.0}]) == 5.0
+
+      def test_multi_item():
+          assert total([{"price": 1.0}, {"price": 2.0}, {"price": 3.0}]) == 6.0
+
+task_spec:
+  issue: "(eval) Fix total() to actually sum item prices"
+  target_branch_name: fix/eval-05-cart-total
+
+  files_to_create_or_edit:
+    - src/cart.py
+
+  function_signatures:
+    - file: src/cart.py
+      exports:
+        - "def total(items: list[dict]) -> float"
+
+  expected_diff_shape:
+    - src/cart.py: modified (~3 lines changed; replace single-item return with sum that handles empty cart)
+
+  test_files_and_cases: []   # tests already exist and currently fail
+
+  acceptance_check:
+    command: "python3 -m pytest -q"
+    expected: "exit code 0; 3 passed"
+
+  out_of_scope:
+    - editing tests
+    - changing the function signature
+    - adding type validation beyond what the original had
+    - "performance optimization (don't reach for numpy or comprehensions when sum() works)"
+
+  allowed_new_dependencies:
+    pip:
+      - pytest
+
+  budget:
+    max_executor_attempts: 2
+    max_codex_calls: 3
+    wall_clock_hours: 1

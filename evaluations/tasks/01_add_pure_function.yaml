@@ -1,0 +1,51 @@
+# Eval 01 — add a pure function with a test.
+# Covers: simplest possible "fill in the blank" against a clear spec.
+
+fixture:
+  language: python
+  starter:
+    "src/__init__.py": ""
+    "src/math_utils.py": ""
+    "tests/__init__.py": ""
+
+task_spec:
+  issue: "(eval) Add pure function compute_macros"
+  target_branch_name: feature/eval-01-add-compute-macros
+
+  files_to_create_or_edit:
+    - src/math_utils.py
+    - tests/test_math_utils.py
+
+  function_signatures:
+    - file: src/math_utils.py
+      exports:
+        - "def compute_macros(protein_g: float, carb_g: float, fat_g: float) -> dict[str, float]"
+
+  expected_diff_shape:
+    - src/math_utils.py: created (~15 lines, single function returning {'kcal','protein_g','carb_g','fat_g'})
+    - tests/test_math_utils.py: created (~20 lines, 3 cases)
+
+  test_files_and_cases:
+    - file: tests/test_math_utils.py
+      cases:
+        - "zeros yield zero kcal"
+        - "1g protein + 1g carb + 1g fat yields 4+4+9 = 17 kcal"
+        - "negative inputs raise ValueError"
+
+  acceptance_check:
+    command: "python3 -m pytest -q"
+    expected: "exit code 0; 3 passed"
+
+  out_of_scope:
+    - per-meal aggregation
+    - calorie tracking storage
+    - any I/O
+
+  allowed_new_dependencies:
+    pip:
+      - pytest
+
+  budget:
+    max_executor_attempts: 2
+    max_codex_calls: 4
+    wall_clock_hours: 1

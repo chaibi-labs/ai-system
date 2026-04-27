@@ -1,0 +1,69 @@
+name: mobile-app
+description: Mobile feature or full mobile app workflow. iOS-native build/signing happens on Anis's Mac or via EAS (cost-gated).
+trigger: "Mobile feature or app requested"
+
+default_stack:
+  framework: Expo + React Native + TypeScript
+  state: Zustand or React Query (decide per product)
+  local_data: SQLite (expo-sqlite)
+  backend: none at MVP
+
+steps:
+  - agent: pm
+    task: define user flow at the screen level
+    output: flow diagram or numbered list of screen transitions
+
+  - agent: design
+    task: define screens (per design brief) and component prop signatures
+    output: design contract
+
+  - agent: architect
+    task: choose Expo / React Native architecture (navigation lib, state lib, data layer)
+    output: ADR-NNNN
+
+  # Anis approval before code
+  - manual: anis_approve
+    on: design contract + ADR
+
+  - agent: coder.plan
+    task: per issue, produce task_spec
+    output: task_spec per issue
+
+  - agent: coder.execute
+    task: implement app screens and state
+    rule: "no analytics SDK, no auth provider, no paid SDK — BLOCKED if any needed"
+
+  - agent: qa
+    task: test on simulator/device; check on iOS simulator (Mac required) and Android emulator
+    output: test report
+
+  - agent: ops
+    task: prepare build instructions in <repo>/docs/runbook.md (do NOT execute the build)
+    output: runbook + cost summary
+
+  - agent: reviewer
+    task: review code, test coverage, scope, cost flags
+
+  - manual: anis_merge
+  - manual: anis_approve (release)
+    on: ready for TestFlight / App Store / side-load
+
+  - agent: ops
+    task: execute the build per runbook (only after release approval)
+
+decision_gates:
+  - Apple Developer Program ($99/yr) — required for any iOS distribution beyond the simulator
+  - EAS paid build vs local build (cost-gated)
+  - TestFlight distribution (cost-gated)
+  - App Store / Play Store submission
+  - Privacy policy (required for any store submission)
+  - Push notifications (cost-gated)
+  - Cloud sync / backend (cost-gated)
+  - Auth provider (cost-gated)
+
+outputs:
+  - React Native code on a feature branch
+  - Expo config
+  - build runbook
+  - merged PR
+  - (later, after release approval) signed build artifact

@@ -1,0 +1,38 @@
+name: ai-system CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  repo-health:
+    name: Repo health
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Run scripts/repo_health.py
+        run: python3 scripts/repo_health.py
+
+  evals:
+    name: Eval harness (regression gate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install yq (for eval YAML parsing)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq yq
+      - name: Run evaluations
+        run: python3 evaluations/run_evals.py
+        # The executor is currently stubbed, so all tasks land "skipped" — that's
+        # fine. When nightly v3+ wires in the real executor, this gate will
+        # block PRs that drop the pass rate vs main.

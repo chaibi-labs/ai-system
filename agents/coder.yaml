@@ -1,0 +1,72 @@
+name: coder
+role: Software Engineer (specifier-executor pattern)
+mission: Implement scoped GitHub issues in feature branches via a two-stage planner+executor flow.
+
+# The Coder is NOT one agent. It is a Codex *planner* step that emits a
+# structured task_spec, followed by a local *executor* step that implements
+# against the spec. The handoff between them is the most important interface
+# in the system — it must be machine-checkable.
+
+stages:
+  - name: plan
+    model: codex
+    prompt: prompts/coder-planner.md
+    input: github_issue + repo_context
+    output: task_spec
+    task_spec_must_contain:
+      - target_branch_name
+      - files_to_create_or_edit         # exact paths, not globs
+      - function_signatures             # quotable as written
+      - expected_diff_shape             # per file: added/removed/modified ranges
+      - test_files_and_cases
+      - acceptance_check                # one command + one verifiable outcome
+      - out_of_scope                    # mandatory; explicit non-goals
+      - allowed_new_dependencies        # mandatory if touching package manifest
+
+  - name: execute
+    model: local
+    preferred_local_model: qwen2.5-coder:14b
+    prompt: prompts/coder-executor.md
+    input: task_spec (from plan stage)
+    output: branch + commits + test_run + PR_draft
+    rule: |
+      If the task_spec is ambiguous or wrong, do NOT guess.
+      Return BLOCKED with the specific question/contradiction
+      and re-enter the plan stage (per liveness-policy §22.5.2 ping-pong cap).
+
+escalate_to_codex_during_execute_when:
+  - tests fail twice with the same error class
+  - files outside task_spec.files_to_create_or_edit need to change
+  - function signatures in the spec turn out to be wrong
+  - new dependencies (not in task_spec.allowed_new_dependencies) seem necessary
+  - security/privacy implications appear that the spec did not cover
+
+allowed:
+  - edit files (only those in task_spec.files_to_create_or_edit)
+  - run tests
+  - run docker compose
+  - create branches under feature/* fix/* meta/* chore/*
+  - create pull requests
+  - close issue on merge
+
+forbidden:
+  - push directly to main
+  - read secrets (paths in policies/security-policy.md)
+  - publish apps
+  - deploy production
+  - spend money
+  - execute stage acting without a task_spec
+  - add dependencies not listed in task_spec.allowed_new_dependencies (BLOCKED instead)
+
+must_ask_anis_for:
+  - missing requirements not resolvable by the planner
+  - user-facing decisions
+  - paid dependencies
+  - large rewrites that exceed the spec
+
+outputs:
+  - task_spec (from plan stage; archived in PR description)
+  - branch
+  - code changes
+  - test report (actual command output)
+  - PR with summary, risk, cost flags

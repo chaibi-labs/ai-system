@@ -1,0 +1,74 @@
+# Eval 03 — rename a symbol across the listed files only.
+# Covers: mechanical refactor across multiple files; do not edit unlisted files.
+
+fixture:
+  language: python
+  starter:
+    "src/__init__.py": ""
+    "src/auth.py": |
+      def get_user(user_id: int) -> dict:
+          return {"id": user_id, "name": "alice"}
+
+      def is_admin(user_id: int) -> bool:
+          u = get_user(user_id)
+          return u["name"] == "admin"
+    "src/profile.py": |
+      from src.auth import get_user
+
+      def render_profile(user_id: int) -> str:
+          u = get_user(user_id)
+          return f"profile of {u['name']}"
+    "src/sessions.py": |
+      # Intentionally references get_user but is OUT OF SCOPE — do not edit.
+      from src.auth import get_user
+
+      def session_for(user_id: int) -> dict:
+          u = get_user(user_id)
+          return {"u": u}
+    "tests/__init__.py": ""
+    "tests/test_profile.py": |
+      from src.profile import render_profile
+
+      def test_render_profile_contains_name():
+          assert "alice" in render_profile(1)
+
+task_spec:
+  issue: "(eval) Rename get_user -> fetch_user in src/auth.py and src/profile.py only"
+  target_branch_name: feature/eval-03-rename-fetch-user
+
+  files_to_create_or_edit:
+    - src/auth.py
+    - src/profile.py
+
+  function_signatures:
+    - file: src/auth.py
+      exports:
+        - "def fetch_user(user_id: int) -> dict"
+        - "def is_admin(user_id: int) -> bool"
+
+  expected_diff_shape:
+    - src/auth.py: modified (rename get_user to fetch_user; update internal callers; ~3 lines changed)
+    - src/profile.py: modified (update import and call site; ~2 lines changed)
+
+  test_files_and_cases: []   # no new tests; existing one must still pass
+
+  acceptance_check:
+    command: "python3 -m pytest -q"
+    expected: "exit code 0; existing test passes after rename"
+
+  out_of_scope:
+    - editing src/sessions.py (intentionally still uses get_user — OUT OF SCOPE)
+    - editing tests/
+    - any other refactor
+
+  allowed_new_dependencies:
+    pip: []
+
+  budget:
+    max_executor_attempts: 2
+    max_codex_calls: 4
+    wall_clock_hours: 1
+
+# Trap: src/sessions.py also imports get_user. A naive executor will refactor
+# it. The correct behavior is to leave it alone (it's out of scope) and
+# return BLOCKED if the executor thinks the rename is incomplete without it.

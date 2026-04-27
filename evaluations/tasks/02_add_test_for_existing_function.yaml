@@ -1,0 +1,53 @@
+# Eval 02 — add a test for an existing function (the executor should not modify the function).
+# Covers: scope discipline (don't touch what isn't listed).
+
+fixture:
+  language: python
+  starter:
+    "src/__init__.py": ""
+    "src/strings.py": |
+      def slugify(s: str) -> str:
+          import re
+          s = s.lower().strip()
+          s = re.sub(r"[^a-z0-9]+", "-", s)
+          return s.strip("-")
+    "tests/__init__.py": ""
+
+task_spec:
+  issue: "(eval) Add tests for slugify"
+  target_branch_name: feature/eval-02-test-slugify
+
+  files_to_create_or_edit:
+    - tests/test_strings.py
+
+  function_signatures: []   # no new functions
+
+  expected_diff_shape:
+    - tests/test_strings.py: created (~25 lines, 5 cases)
+
+  test_files_and_cases:
+    - file: tests/test_strings.py
+      cases:
+        - "lowercases input"
+        - "replaces spaces with hyphens"
+        - "collapses runs of non-alphanum into single hyphen"
+        - "strips leading and trailing hyphens"
+        - "empty string returns empty string"
+
+  acceptance_check:
+    command: "python3 -m pytest -q"
+    expected: "exit code 0; 5 passed"
+
+  out_of_scope:
+    - changing src/strings.py
+    - adding new functions
+    - any other test files
+
+  allowed_new_dependencies:
+    pip:
+      - pytest
+
+  budget:
+    max_executor_attempts: 2
+    max_codex_calls: 3
+    wall_clock_hours: 1

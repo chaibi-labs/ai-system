@@ -1,0 +1,10 @@
+{
+  "files_created":  [],
+  "files_modified": ["src/cart.py"],
+  "tests_added":    [],
+  "acceptance":     "pass",
+  "test_pass_count": 3,
+  "diff_lines_max": 10,
+  "must_not_modify": ["tests/test_cart.py"],
+  "min_change_note": "The fix should be the smallest change that makes all 3 tests pass — typically `return sum(i['price'] for i in items)` and an empty-list guard if not implicit."
+}

@@ -1,0 +1,70 @@
+name: nightly-system-improvement
+description: Runs every night. Default mode is report-only (v1). Anis raises the level (v2 → v4) per policies/nightly-policy.md.
+trigger: "schedule: daily"
+default_mode: report-only
+
+steps:
+  - agent: nightly
+    task: pre-action — HALT check, quota check, session bootstrap
+    rule: "abort with one-line note if HALT; degrade if quota red/exhausted"
+
+  - agent: nightly
+    task: scan ai-system files (every file is in scope for the report)
+    output: inventory of policies / prompts / agents / workflows / scripts
+
+  - agent: nightly
+    task: scan all chaibi-labs repos via gh — open issues, PRs, CI status, branch staleness
+    output: aggregated activity log
+
+  - agent: nightly
+    task: identify STUCK queue, Waiting-for-Anis queue, decision gates older than 24h, cascade halts
+    output: anti_stall_report (per liveness §22.5.8)
+
+  - agent: nightly
+    task: detect repeated agent mistakes (same BLOCKED reason 3+ times, same test failure, same scope-creep)
+    output: pattern report
+
+  - agent: nightly
+    task: scan evaluations/reports/ — has the eval pass rate dropped vs. prior runs?
+    output: regression flag (if any)
+
+  - agent: nightly
+    task: write reports/nightly/YYYY-MM-DD.md with anti_stall_report at top, then sections 2-9 of prompts/nightly.md
+    output: nightly report
+
+  # v2+ only
+  - agent: nightly
+    task: (v2+) create issues for the improvements identified above, label `agent:nightly`
+    if: current_level >= v2
+    output: improvement issues in Inbox
+
+  # v3+ only — modifies ai-system itself
+  - agent: nightly
+    task: (v3+) create branch meta/nightly-YYYY-MM-DD in ai-system; edit prompts / policies / workflows; open PR
+    if: current_level >= v3
+    rule: "PR cannot merge if evaluations/run_evals.py shows regression vs main baseline"
+    output: PR in ai-system (Anis decides whether to merge)
+
+  # v4+ only — touches product repos for low-risk changes
+  - agent: nightly
+    task: (v4+) open low-risk PRs in product repos — docs / tests / lint fixes only, no feature code
+    if: current_level >= v4
+    output: PRs in product repos (Anis or reviewer decides whether to merge)
+
+  - agent: pm
+    task: read the nightly report and propose next-day priorities; surface decision gates
+    output: morning summary at the top of the next morning rhythm
+
+forbidden_at_every_level:
+  - paid API usage without Anis approval
+  - publishing
+  - deployment
+  - merging any PR (auto or manual)
+  - deleting repos / branches with history
+  - touching policies/security-policy.md or policies/cost-policy.md (proposing via PR is OK; merging is not nightly's call)
+
+allowed_outputs:
+  v1: [report]
+  v2: [report, issue]
+  v3: [report, issue, draft_pr_in_ai_system]
+  v4: [report, issue, draft_pr_in_ai_system, draft_pr_low_risk_product]

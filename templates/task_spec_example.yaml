@@ -1,0 +1,95 @@
+# Worked task_spec example — the canonical instance for the planner to imitate.
+#
+# This is the spec for food-tracker issue #2 ("Create Expo app scaffold").
+# When the food-tracker repo is created at runtime by the studio, this becomes
+# the first real task the planner emits.
+#
+# Rules for any planner output (per prompts/coder-planner.md):
+#   - File paths exact, not globs
+#   - Function signatures quotable as written
+#   - expected_diff_shape is a per-file budget (overrun = BLOCKED)
+#   - acceptance_check is one command + one verifiable outcome
+#   - out_of_scope is mandatory
+#   - allowed_new_dependencies is mandatory whenever a manifest is touched
+
+task_spec:
+  issue: "#2 Create Expo app scaffold"
+  target_branch_name: feature/expo-scaffold
+
+  files_to_create_or_edit:
+    - apps/mobile/package.json
+    - apps/mobile/app.config.ts
+    - apps/mobile/tsconfig.json
+    - apps/mobile/App.tsx
+    - apps/mobile/src/screens/Today.tsx
+    - apps/mobile/src/screens/AddFood.tsx
+    - apps/mobile/src/screens/SavedMeals.tsx
+    - apps/mobile/src/screens/Settings.tsx
+    - apps/mobile/src/navigation/RootNavigator.tsx
+    - apps/mobile/src/navigation/__tests__/RootNavigator.test.tsx
+    - apps/mobile/README.md
+
+  function_signatures:
+    - file: apps/mobile/src/navigation/RootNavigator.tsx
+      exports:
+        - "export function RootNavigator(): JSX.Element"
+    - file: apps/mobile/src/screens/Today.tsx
+      exports:
+        - "export default function TodayScreen(): JSX.Element"
+    - file: apps/mobile/src/screens/AddFood.tsx
+      exports:
+        - "export default function AddFoodScreen(): JSX.Element"
+    - file: apps/mobile/src/screens/SavedMeals.tsx
+      exports:
+        - "export default function SavedMealsScreen(): JSX.Element"
+    - file: apps/mobile/src/screens/Settings.tsx
+      exports:
+        - "export default function SettingsScreen(): JSX.Element"
+
+  expected_diff_shape:
+    - apps/mobile/package.json: created (name, version, main=expo-router/entry, deps from allowed_new_dependencies)
+    - apps/mobile/app.config.ts: created (~20 lines, Expo config with name + slug)
+    - apps/mobile/tsconfig.json: created (~10 lines, extends expo/tsconfig.base)
+    - apps/mobile/App.tsx: created (~15 lines, imports RootNavigator, wraps in NavigationContainer)
+    - apps/mobile/src/screens/*.tsx: created (~10 lines each, placeholder Text + View)
+    - apps/mobile/src/navigation/RootNavigator.tsx: created (~25 lines, native stack with 4 screens)
+    - apps/mobile/src/navigation/__tests__/RootNavigator.test.tsx: created (~25 lines)
+    - apps/mobile/README.md: created (~30 lines, run instructions + architecture note)
+
+  test_files_and_cases:
+    - file: apps/mobile/src/navigation/__tests__/RootNavigator.test.tsx
+      cases:
+        - "renders without crashing"
+        - "registers all four screen routes"
+
+  acceptance_check:
+    command: "cd apps/mobile && pnpm install && pnpm test && pnpm tsc --noEmit"
+    expected: "exit code 0; tests pass; no type errors"
+
+  out_of_scope:
+    - local SQLite persistence (issue #6)
+    - actual food entry logic (issue #5)
+    - backend, auth, cloud sync (deferred per source plan §18.2)
+    - styling beyond minimum to render
+    - dark mode / theming
+    - any analytics or tracking
+
+  allowed_new_dependencies:
+    npm:
+      - expo
+      - react
+      - react-native
+      - "@react-navigation/native"
+      - "@react-navigation/native-stack"
+      - typescript
+      - "@types/react"
+      - "@testing-library/react-native"
+      - jest
+      - jest-expo
+    # Anything not on this list = BLOCKED. Executor returns to planner.
+    # Dep additions are a Codex (planner) decision, never an executor improvisation.
+
+  budget:
+    max_executor_attempts: 3
+    max_codex_calls: 6
+    wall_clock_hours: 2
