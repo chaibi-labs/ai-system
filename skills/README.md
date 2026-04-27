@@ -2,7 +2,7 @@
 
 OpenClaw workspace skills for Anis's Personal AI Dev Studio.
 
-These are versioned here in `ai-system/` and symlinked into the live OpenClaw workspace (`~/.openclaw/workspace/skills/<name>`) so OpenClaw picks them up. Edit here, commit, pull on the host, and re-link if a new skill is added.
+These are versioned here in `ai-system/` and registered with OpenClaw via `skills.load.extraDirs` in `~/.openclaw/openclaw.json`. The host points at `~/src/ai-system/skills/` directly — no copy, no symlink. Edit here, commit, `git pull` on the host, and OpenClaw's filesystem watcher picks up the change automatically (debounced via `skills.load.watchDebounceMs`).
 
 ## Skills
 
@@ -33,8 +33,14 @@ Any future enable is a deliberate Anis call, with a release-style checklist (`po
 1. Edit a `SKILL.md` here.
 2. Commit + PR to `chaibi-labs/ai-system` (the meta-system follows its own rules).
 3. After merge, on the host: `cd ~/src/ai-system && git pull`.
-4. The symlink at `~/.openclaw/workspace/skills/<name>` points to `~/src/ai-system/skills/<name>` — no copy needed.
-5. OpenClaw picks up changes automatically (or `openclaw skills list` to verify).
+4. OpenClaw's `skills.load.extraDirs` already includes `/home/anis/src/ai-system/skills`, so the new content is picked up by the filesystem watcher.
+5. Verify with `openclaw skills list` — your skill should appear with source `openclaw-extra`.
+
+## One-time host setup (already done)
+
+```bash
+openclaw config set skills.load.extraDirs '["/home/anis/src/ai-system/skills"]'
+```
 
 ## How a skill body works
 
