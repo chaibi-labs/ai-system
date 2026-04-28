@@ -293,6 +293,86 @@ def has_staged_changes(repo_dir: Path) -> bool:
     return res.returncode != 0
 
 
+def parse_expected_diff_budget(entry: object) -> dict[str, object]:
+    """Parse a per-file expected_diff_shape entry into numeric guard limits."""
+    if isinstance(entry, dict):
+        return {
+            "max_added_lines": int(entry.get("max_added_lines", 0)),
+            "max_deleted_lines": int(entry.get("max_deleted_lines", 0)),
+            "forbid_rewrite": bool(entry.get("forbid_rewrite", False)),
+        }
+
+    text = str(entry).lower()
+    added_match = re.search(r"~?\s*(\d+)\s+(?:added|inserted)", text)
+    deleted_match = re.search(r"~?\s*(\d+)\s+deleted", text)
+    max_added = int(added_match.group(1)) if added_match else 0
+    max_deleted = int(deleted_match.group(1)) if deleted_match else 0
+    if "inserted lines only" in text or "no-other-edits" in text:
+        max_deleted = 0
+    forbid_rewrite = any(
+        phrase in text
+        for phrase in (
+            "do not rewrite",
+            "must be modified, not created",
+            "inserted lines only",
+            "preserve/no-other-edits",
+        )
+    )
+    return {
+        "max_added_lines": max_added,
+        "max_deleted_lines": max_deleted,
+        "forbid_rewrite": forbid_rewrite,
+    }
+
+
+def collect_staged_diff_stats(repo_dir: Path) -> dict[str, dict[str, int]]:
+    """Return staged add/delete counts keyed by relative file path."""
+    res = run(["git", "diff", "--cached", "--numstat"], cwd=repo_dir, check=False)
+    stats: dict[str, dict[str, int]] = {}
+    for line in res.stdout.splitlines():
+        parts = line.split("\t")
+        if len(parts) != 3:
+            continue
+        added_s, deleted_s, path = parts
+        added = 0 if added_s == "-" else int(added_s)
+        deleted = 0 if deleted_s == "-" else int(deleted_s)
+        stats[path] = {"added": added, "deleted": deleted}
+    return stats
+
+
+def scope_guard_violations(task_spec: dict, repo_dir: Path) -> list[str]:
+    """Validate staged changes against task_spec file scope and diff budgets."""
+    allowed_files = set(task_spec.get("files_to_create_or_edit") or [])
+    diff_stats = collect_staged_diff_stats(repo_dir)
+    violations: list[str] = []
+
+    for path in sorted(diff_stats):
+        if allowed_files and path not in allowed_files:
+            violations.append(f"{path}: staged edit outside task_spec.files_to_create_or_edit")
+
+    budgets: dict[str, dict[str, object]] = {}
+    for entry in task_spec.get("expected_diff_shape") or []:
+        if isinstance(entry, dict):
+            for path, budget_entry in entry.items():
+                budgets[path] = parse_expected_diff_budget(budget_entry)
+
+    for path, budget in budgets.items():
+        if path not in diff_stats:
+            continue
+        stats = diff_stats[path]
+        max_added = int(budget.get("max_added_lines", 0))
+        max_deleted = int(budget.get("max_deleted_lines", 0))
+        forbid_rewrite = bool(budget.get("forbid_rewrite", False))
+        if max_added and stats["added"] > max_added:
+            violations.append(f"{path}: added lines {stats['added']} exceed budget {max_added}")
+        if stats["deleted"] > max_deleted:
+            violations.append(f"{path}: deleted lines {stats['deleted']} exceed budget {max_deleted}")
+        if forbid_rewrite and stats["deleted"] > 0:
+            violations.append(f"{path}: rewrite/delete blocked by expected_diff_shape")
+
+    return violations
+
+
 # ---------- main ----------------------------------------------------------
 
 
@@ -386,6 +466,19 @@ def main() -> int:
             print("(no acceptance_check command in task_spec)", flush=True)
 
         run(["git", "add", "-A"], cwd=repo_dir)
+        violations = scope_guard_violations(spec, repo_dir)
+        if violations:
+            body = "Executor scope guard BLOCKED\n\n" + "\n".join(
+                f"- {violation}" for violation in violations
+            )
+            run([
+                "gh", "issue", "comment", str(args.issue),
+                "--repo", args.repo, "--body", body,
+            ])
+            print("BLOCKED: Executor scope guard BLOCKED", flush=True)
+            for violation in violations:
+                print(f"  - {violation}", flush=True)
+            return 1
         if not has_staged_changes(repo_dir):
             print("Executor produced no diff vs main. Aborting (no commit).", file=sys.stderr)
             return 1
