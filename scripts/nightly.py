@@ -13,6 +13,7 @@ scripts/repo_health.py.
 
 from __future__ import annotations
 
+import argparse
 import json
 import subprocess
 import sys
@@ -110,20 +111,46 @@ def report_skeleton() -> str:
     return "\n".join(sections)
 
 
-def main() -> int:
-    if halted():
-        print("HALT file present; nightly aborted.", file=sys.stderr)
-        return 0
+def nightly_report_path(now: datetime | None = None) -> Path:
+    timestamp = now or datetime.now(timezone.utc)
+    return REPO_ROOT / "reports" / "nightly" / f"{timestamp.date().isoformat()}.md"
 
-    out_dir = REPO_ROOT / "reports" / "nightly"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    out = out_dir / f"{datetime.now(timezone.utc).date().isoformat()}.md"
+
+def write_report_skeleton(*, force: bool = False) -> Path:
+    out = nightly_report_path()
+    out.parent.mkdir(parents=True, exist_ok=True)
+
+    if out.exists() and out.read_text(encoding="utf-8").strip() and not force:
+        print(f"Preserved existing report: {out.relative_to(REPO_ROOT)}")
+        print("Use --force to regenerate the nightly skeleton.")
+        return out
 
     out.write_text(report_skeleton(), encoding="utf-8")
     print(f"Wrote skeleton: {out.relative_to(REPO_ROOT)}")
     print(
         "Next: nightly agent (local model) fills in the sections per prompts/nightly.md."
     )
+    return out
+
+
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Generate the nightly report skeleton.")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite an existing non-empty report for today",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv or sys.argv[1:])
+
+    if halted():
+        print("HALT file present; nightly aborted.", file=sys.stderr)
+        return 0
+
+    write_report_skeleton(force=args.force)
     return 0
 
 
