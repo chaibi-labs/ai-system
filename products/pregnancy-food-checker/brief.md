@@ -1,6 +1,6 @@
 # Product Brief: pregnancy-food-checker
 
-**Status:** Drafting
+**Status:** Approved
 **Date:** 2026-04-28
 **Owner:** PM agent (Anis approves)
 

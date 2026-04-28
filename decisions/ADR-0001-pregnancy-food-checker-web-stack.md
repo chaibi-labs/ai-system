@@ -1,6 +1,6 @@
 # ADR-0001: pregnancy-food-checker web stack
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-04-28
 **Deciders:** Anis (Vega/architect proposed)
 
