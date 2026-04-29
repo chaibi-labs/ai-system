@@ -12,6 +12,7 @@ spec.loader.exec_module(product_autopilot)
 
 Issue = product_autopilot.Issue
 choose_issue = product_autopilot.choose_issue
+choose_issues = product_autopilot.choose_issues
 build_worker_prompt = product_autopilot.build_worker_prompt
 
 
@@ -70,3 +71,27 @@ def test_worker_prompt_contains_hard_stops_and_po_merge_gates():
     assert "PO merge gates" in prompt
     assert "CI/checks: pass/fail" in prompt
     assert "sourcing ~/.ai-system/secrets/po-pregnancy-food-checker.env" in prompt
+
+
+def test_choose_issues_returns_bounded_serial_batch():
+    issues = [
+        issue(1, "Needs token", ["priority:P1", "decision:anis"]),
+        issue(2, "First safe", ["priority:P1"], "2026-01-02T00:00:00Z"),
+        issue(3, "Second safe", ["priority:P2"], "2026-01-01T00:00:00Z"),
+        issue(4, "Third safe", ["priority:P3"], "2026-01-01T00:00:00Z"),
+    ]
+
+    selected = choose_issues(issues, max_issues=2)
+
+    assert [item.number for item in selected] == [2, 3]
+
+
+def test_choose_issues_with_specific_issue_ignores_batch_size():
+    issues = [
+        issue(2, "First safe", ["priority:P1"]),
+        issue(3, "Second safe", ["priority:P2"]),
+    ]
+
+    selected = choose_issues(issues, max_issues=5, issue_number=3)
+
+    assert [item.number for item in selected] == [3]

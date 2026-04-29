@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """
-product_autopilot.py — conservative one-issue product autopilot coordinator.
+product_autopilot.py — conservative product autopilot coordinator.
 
-This script does not bypass the studio workflow. It selects one unblocked issue for
-an assigned product, builds the exact PO-worker task prompt, and optionally claims
-the issue with an autopilot comment.
+This script does not bypass the studio workflow. It selects unblocked issues for
+an assigned product, builds exact PO-worker task prompts, and optionally claims
+each issue with an autopilot comment.
 
-It is intentionally one issue at a time. The worker still uses normal GitHub flow:
+It supports a bounded serial loop. Workers still use normal GitHub flow:
 issue -> branch -> PR -> local tests -> CI -> PO gate comment -> PO-token merge.
 
 Usage:
   python3 scripts/product_autopilot.py pregnancy-food-checker --dry-run
   python3 scripts/product_autopilot.py pregnancy-food-checker --issue 37 --dry-run
   python3 scripts/product_autopilot.py pregnancy-food-checker --claim
+  python3 scripts/product_autopilot.py pregnancy-food-checker --max-issues 3 --dry-run
 """
 
 from __future__ import annotations
@@ -112,6 +113,11 @@ def list_open_issues(token: str, repo: str) -> list[Issue]:
     return sorted(issues, key=lambda issue: (issue.priority_rank, issue.created_at, issue.number))
 
 
+def ordered_unblocked_issues(issues: list[Issue]) -> list[Issue]:
+    ordered = sorted(issues, key=lambda issue: (issue.priority_rank, issue.created_at, issue.number))
+    return [issue for issue in ordered if not issue.is_blocked]
+
+
 def choose_issue(issues: list[Issue], issue_number: int | None = None) -> Issue | None:
     ordered = sorted(issues, key=lambda issue: (issue.priority_rank, issue.created_at, issue.number))
     if issue_number is not None:
@@ -119,10 +125,17 @@ def choose_issue(issues: list[Issue], issue_number: int | None = None) -> Issue 
             if issue.number == issue_number:
                 return None if issue.is_blocked else issue
         return None
-    for issue in ordered:
-        if not issue.is_blocked:
-            return issue
-    return None
+    unblocked = ordered_unblocked_issues(issues)
+    return unblocked[0] if unblocked else None
+
+
+def choose_issues(issues: list[Issue], max_issues: int, issue_number: int | None = None) -> list[Issue]:
+    if max_issues < 1:
+        raise PoConfigError("max_issues must be at least 1")
+    if issue_number is not None:
+        selected = choose_issue(issues, issue_number)
+        return [selected] if selected else []
+    return ordered_unblocked_issues(issues)[:max_issues]
 
 
 def build_worker_prompt(product_name: str, product: dict[str, Any], issue: Issue) -> str:
@@ -156,9 +169,9 @@ PO merge gates:
 Final response back to parent must include: issue URL, PR URL, merge status, tests run, risk, cost flags, decisions needed, heartbeat."""
 
 
-def claim_issue(token: str, repo: str, issue: Issue) -> str:
+def claim_issue(token: str, repo: str, issue: Issue, run_position: int = 1, run_total: int = 1) -> str:
     body = (
-        "Autopilot picked this issue for one-issue PO execution. "
+        f"Autopilot picked this issue for PO execution ({run_position}/{run_total} in this bounded serial run). "
         "It will stop and report BLOCKED if cost, secrets, provider setup, privacy/legal, "
         "product direction, release, branch protection, or merge-gate exceptions are needed."
     )
@@ -166,7 +179,16 @@ def claim_issue(token: str, repo: str, issue: Issue) -> str:
     return str(response.get("html_url", ""))
 
 
-def run(product_name: str, issue_number: int | None, claim: bool) -> dict[str, Any]:
+def issue_json(issue: Issue) -> dict[str, Any]:
+    return {
+        "number": issue.number,
+        "title": issue.title,
+        "url": issue.html_url,
+        "labels": list(issue.labels),
+    }
+
+
+def run(product_name: str, issue_number: int | None, claim: bool, max_issues: int = 1) -> dict[str, Any]:
     validation = validate(product_name)
     if validation["verdict"] != "pass":
         return {"verdict": "blocked", "reason": "po credential validation failed", "validation": validation}
@@ -175,8 +197,8 @@ def run(product_name: str, issue_number: int | None, claim: bool) -> dict[str, A
     repo = str(product["repo"])
     token = load_po_token(product)
     issues = list_open_issues(token, repo)
-    issue = choose_issue(issues, issue_number)
-    if issue is None:
+    selected_issues = choose_issues(issues, max_issues=max_issues, issue_number=issue_number)
+    if not selected_issues:
         return {
             "verdict": "blocked",
             "reason": "no unblocked matching issue",
@@ -186,20 +208,34 @@ def run(product_name: str, issue_number: int | None, claim: bool) -> dict[str, A
             ],
         }
 
-    claim_url = claim_issue(token, repo, issue) if claim else None
-    return {
+    total = len(selected_issues)
+    runs = []
+    for index, issue in enumerate(selected_issues, start=1):
+        claim_url = claim_issue(token, repo, issue, run_position=index, run_total=total) if claim else None
+        runs.append({
+            "issue": issue_json(issue),
+            "claim_comment": claim_url,
+            "worker_prompt": build_worker_prompt(product_name, product, issue),
+            "run_position": index,
+            "run_total": total,
+        })
+
+    result = {
         "verdict": "ready",
         "product": product_name,
         "repo": repo,
-        "issue": {
-            "number": issue.number,
-            "title": issue.title,
-            "url": issue.html_url,
-            "labels": list(issue.labels),
-        },
-        "claim_comment": claim_url,
-        "worker_prompt": build_worker_prompt(product_name, product, issue),
+        "mode": "multi" if len(runs) > 1 else "single",
+        "max_issues": max_issues,
+        "runs": runs,
     }
+    # Backwards-compatible fields for callers that expect a one-issue response.
+    if len(runs) == 1:
+        result.update({
+            "issue": runs[0]["issue"],
+            "claim_comment": runs[0]["claim_comment"],
+            "worker_prompt": runs[0]["worker_prompt"],
+        })
+    return result
 
 
 def main() -> int:
@@ -210,12 +246,13 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("product", help="product config name, e.g. pregnancy-food-checker")
     parser.add_argument("--issue", type=int, help="specific issue number to run instead of selecting next unblocked issue")
-    parser.add_argument("--claim", action="store_true", help="post an autopilot claim comment to the selected issue")
-    parser.add_argument("--dry-run", action="store_true", help="do not claim the issue; print selected issue and worker prompt")
+    parser.add_argument("--claim", action="store_true", help="post an autopilot claim comment to selected issue(s)")
+    parser.add_argument("--dry-run", action="store_true", help="do not claim issues; print selected issue(s) and worker prompts")
+    parser.add_argument("--max-issues", type=int, default=1, help="maximum number of unblocked issues to select for a bounded serial run (default: 1)")
     args = parser.parse_args()
 
     try:
-        result = run(args.product, args.issue, claim=args.claim and not args.dry_run)
+        result = run(args.product, args.issue, claim=args.claim and not args.dry_run, max_issues=args.max_issues)
     except PoConfigError as exc:
         print(json.dumps({"verdict": "blocked", "error": str(exc)}, indent=2))
         return 1

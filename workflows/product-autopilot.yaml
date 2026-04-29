@@ -1,9 +1,10 @@
 name: product-autopilot
-description: Conservative one-issue-at-a-time autopilot for an assigned product PO.
+description: Conservative bounded serial autopilot for an assigned product PO.
 trigger: "Vega or Anis requests autopilot for a product"
 
 principles:
-  - one issue per run
+  - bounded serial run; default one issue, explicit max required for more
+  - no parallel workers and no second issue starts after a BLOCKED/failed issue
   - no cost, secrets, provider setup, release, branch-protection, or product-direction decisions without Anis
   - use normal GitHub issue/branch/PR/CI flow
   - merge only through the assigned Product Owner token after PO gates pass
@@ -15,20 +16,20 @@ steps:
     output: validation JSON with verdict pass
 
   - agent: po
-    task: select one unblocked issue with scripts/product_autopilot.py; prefer priority labels then age
-    output: selected issue and worker prompt
+    task: select up to max_issues unblocked issues with scripts/product_autopilot.py; prefer priority labels then age
+    output: selected issue(s) and worker prompt(s)
 
   - agent: po
-    task: claim the issue with an autopilot comment
-    output: claim comment URL
+    task: claim selected issue(s) with autopilot comments
+    output: claim comment URL(s)
 
   - agent: po-worker
-    task: execute the worker prompt for the selected issue
+    task: execute worker prompts serially; stop after first BLOCKED or failed worker
     output: PR URL, local test output, CI state, PO gate checklist
 
   - agent: po
     task: merge with PO token if all PO merge gates pass; otherwise comment with failed gate and return BLOCKED
-    output: merged PR or BLOCKED gate
+    output: merged PR(s) or first BLOCKED gate
 
 hard_stops:
   - cost or paid quota
@@ -41,8 +42,8 @@ hard_stops:
   - unresolved blocker comments
 
 outputs:
-  - selected issue URL
-  - PR URL or BLOCKED reason
+  - selected issue URL(s)
+  - PR URL(s) or first BLOCKED reason
   - tests run
   - PO gate checklist
   - merge status
