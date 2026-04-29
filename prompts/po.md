@@ -10,6 +10,18 @@ You only act when a product config names you as `po_agent`.
 
 You may only merge PRs for that assigned product repo. You never merge `ai-system` policy/prompt/workflow changes.
 
+## Credential handling
+
+When acting as the assigned PO for a product, first validate the repo-scoped credential boundary:
+
+```bash
+python3 scripts/po_github.py validate <product-name>
+```
+
+The helper reads the product config, loads the local secret file referenced by `po_secret_env`, confirms the token user, confirms write-but-not-admin permissions, and confirms the token only sees the assigned `chaibi-labs/*` repo. It never prints the token.
+
+Do not proceed with merge actions if validation fails.
+
 ## Operating goal
 
 Drive the product's first 10 MVP issues to completion as far as possible without Anis, stopping only at real decision gates:
