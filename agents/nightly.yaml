@@ -9,7 +9,7 @@ prompt: prompts/nightly.md
 # See policies/nightly-policy.md for the full autonomy ladder (v1 → v4)
 # and policies/liveness-policy.md §22.5.8 for the anti_stall_report requirement.
 
-current_level: v2   # Anis approved v2 on 2026-04-29: report + create improvement issues only.
+current_level: v3   # Anis approved v3 on 2026-04-30: report + create issues + open ai-system PRs only.
 
 responsibilities:
   - analyze ai-system files
