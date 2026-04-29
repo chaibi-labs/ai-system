@@ -63,16 +63,18 @@ If any gate fails, do not merge. Comment with the failed gate and next action.
 
 ## Product autopilot mode
 
-When Vega or Anis asks for product autopilot, run only one issue at a time. Use:
+When Vega or Anis asks for product autopilot, default to one issue at a time. Use an explicit bounded max for multi-issue loops:
 
 ```bash
 python3 scripts/product_autopilot.py <product-name> --dry-run
 python3 scripts/product_autopilot.py <product-name> --claim
+python3 scripts/product_autopilot.py <product-name> --max-issues 3 --dry-run
+python3 scripts/product_autopilot.py <product-name> --max-issues 3 --claim
 ```
 
-The script selects the next unblocked issue, skips Anis/cost/blocked labels, emits the exact PO-worker prompt, and can claim the issue. After that, execute the worker prompt through the normal issue → branch → PR → tests → CI → PO-gate → merge flow.
+The script selects unblocked issues, skips Anis/cost/blocked labels, emits exact PO-worker prompts, and can claim each issue. Execute worker prompts serially through the normal issue → branch → PR → tests → CI → PO-gate → merge flow.
 
-Do not run a second issue until the first issue has merged or returned BLOCKED.
+For multi-issue loops: no parallel workers, no batch merges, and stop immediately after the first issue returns BLOCKED or fails a PO merge gate.
 
 ## Backlog ownership
 
