@@ -4,11 +4,12 @@ trigger: "Vega or Anis requests autopilot for a product"
 
 principles:
   - bounded serial run; default one issue, explicit max required for more
-  - no parallel workers and no second issue starts after a BLOCKED/failed issue
+  - no parallel workers and no second issue starts until the current issue is merged or externally BLOCKED
+  - internal failures trigger bounded repair loops before escalation
   - no cost, secrets, provider setup, release, branch-protection, or product-direction decisions without Anis
   - use normal GitHub issue/branch/PR/CI flow
   - merge only through the assigned Product Owner token after PO gates pass
-  - stop loudly with BLOCKED instead of guessing
+  - stop loudly with BLOCKED instead of guessing when an external gate or repair budget is hit
 
 steps:
   - agent: po
@@ -24,7 +25,7 @@ steps:
     output: claim comment URL(s)
 
   - agent: po-worker
-    task: execute worker prompts serially; stop after first BLOCKED or failed worker
+    task: execute worker prompts serially; repair internal failures within budget; stop after first external BLOCKED or budget-exceeded STUCK
     output: PR URL, local test output, CI state, PO gate checklist
 
   - agent: po
@@ -38,12 +39,12 @@ hard_stops:
   - product direction, brand, pricing, or launch choice
   - public release or new exposure
   - branch protection or merge-authority changes
-  - failing or missing CI
-  - unresolved blocker comments
+  - failing or missing CI after repair budget is exhausted
+  - unresolved blocker comments after repair budget is exhausted
 
 outputs:
   - selected issue URL(s)
-  - PR URL(s) or first BLOCKED reason
+  - PR URL(s), repair attempts used, or first BLOCKED/STUCK reason
   - tests run
   - PO gate checklist
   - merge status
