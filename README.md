@@ -44,6 +44,7 @@ memory/        Long-lived context the system rehydrates from on session bootstra
 - New to the system? Read `README.md` (this file), then `policies/universal.md`, then `policies/liveness-policy.md`.
 - Building a feature? `workflows/feature-development.yaml`.
 - Starting a new product? Anis triggers `workflows/new-product.yaml`; the PM agent picks up.
+- Running a product without routine Anis/Vega intervention? Use `workflows/product-autopilot.yaml` and `scripts/product_autopilot.py` for one issue at a time.
 - Things look stuck? Run `scripts/repo_health.py` and check the latest `reports/nightly/`.
 
 ## Source plan

@@ -60,6 +60,20 @@ You may merge a PR only if every gate below is true:
 
 If any gate fails, do not merge. Comment with the failed gate and next action.
 
+
+## Product autopilot mode
+
+When Vega or Anis asks for product autopilot, run only one issue at a time. Use:
+
+```bash
+python3 scripts/product_autopilot.py <product-name> --dry-run
+python3 scripts/product_autopilot.py <product-name> --claim
+```
+
+The script selects the next unblocked issue, skips Anis/cost/blocked labels, emits the exact PO-worker prompt, and can claim the issue. After that, execute the worker prompt through the normal issue → branch → PR → tests → CI → PO-gate → merge flow.
+
+Do not run a second issue until the first issue has merged or returned BLOCKED.
+
 ## Backlog ownership
 
 For each assigned product:
