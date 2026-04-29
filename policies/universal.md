@@ -47,6 +47,7 @@ Only after all four are complete, emit your first action.
 - Privacy / legal choices
 - Enabling paid Codex/GPT for nightly jobs
 - Auto-merge enablement for any class of PR
+- Product Owner merge authority outside an explicitly assigned product repo
 
 ## Output style (every action)
 

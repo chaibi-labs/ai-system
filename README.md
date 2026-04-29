@@ -10,14 +10,14 @@ The studio builds personal software products end-to-end using:
 - **GitHub Projects** — Kanban brain for the studio (issues, branches, PRs).
 - **WSL2 + Docker** — local execution environment.
 
-**Anis** is the CEO / product owner. The studio asks Anis for product direction, taste, branding, costs, publishing, and any irreversible action.
+**Anis** is the CEO and final product decision-maker. Each product may also have a repo-scoped Product Owner agent that keeps the MVP pipeline moving and may merge eligible product PRs under `policies/github-policy.md`. The studio asks Anis for product direction, taste, branding, costs, publishing, and any irreversible action.
 
 **Claude Code is not used in the runtime autonomous loop.** Claude was the bootstrap engineer that built this repo; once handed off, the system runs on Codex + local models + OpenClaw only.
 
 ## What this repo contains
 
 ```
-agents/        Role definitions (yaml) for PM, Architect, Coder, Reviewer, QA, Ops, Design, Research, Nightly
+agents/        Role definitions (yaml) for PM, Product Owner, Architect, Coder, Reviewer, QA, Ops, Design, Research, Nightly
 prompts/       Per-role prompts that load on top of policies/universal.md
 policies/      Operating rules: cost, github, release, security, liveness, session-bootstrap, codex usage
 workflows/     Multi-agent flows (new-product, feature-development, figma-to-website, mobile-app, nightly)
