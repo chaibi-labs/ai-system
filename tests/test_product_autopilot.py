@@ -95,3 +95,14 @@ def test_choose_issues_with_specific_issue_ignores_batch_size():
     selected = choose_issues(issues, max_issues=5, issue_number=3)
 
     assert [item.number for item in selected] == [3]
+
+
+def test_worker_prompt_repairs_internal_failures_before_blocking():
+    product = {"repo": "chaibi-labs/pregnancy-food-checker", "po_agent": "po-pregnancy-food-checker"}
+    prompt = build_worker_prompt("pregnancy-food-checker", product, issue(11, "Fix thing", ["priority:P2"]))
+
+    assert "Stop and return BLOCKED only for external gates" in prompt
+    assert "internal fixable failures" in prompt
+    assert "up to 3 focused repair attempts" in prompt
+    assert "If CI fails, inspect logs, repair, push" in prompt
+    assert "repair attempts used" in prompt

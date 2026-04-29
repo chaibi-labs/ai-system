@@ -152,10 +152,12 @@ Hard requirements:
 - Use normal GitHub flow: inspect issue, create branch, commit, PR, local tests, CI, PO gate comment, merge with PO token only if gates pass.
 - Use the PO token only by sourcing ~/.ai-system/secrets/{product.get('po_agent')}.env locally; never echo it.
 - Keep change small and one-concern.
-- Stop and return BLOCKED if the issue requires cost, API tokens/secrets, Render/provider setup, privacy/legal/product direction, public release, branch protection, or any exception to PO merge gates.
+- Stop and return BLOCKED only for external gates: cost, API tokens/secrets, Render/provider setup, privacy/legal/product direction, public release, branch protection, or any exception to PO merge gates.
+- For internal fixable failures (local test/lint/build failure, CI red, merge conflict, or review blocker), repair within budget before giving up.
+- Repair budget: up to 3 focused repair attempts per issue, then mark STUCK/BLOCKED with exact failure evidence.
 - Add or update regression tests for the behavior.
 - Run the relevant focused test, npm test, and npm run build locally before PR when this is the Next.js product.
-- Wait for GitHub CI to pass before PO merge.
+- Wait for GitHub CI to pass before PO merge. If CI fails, inspect logs, repair, push, and re-wait within budget.
 - After merge, verify PR merged by the PO token user and linked issue closed.
 
 PO merge gates:
@@ -166,7 +168,7 @@ PO merge gates:
 - unresolved blockers: pass/fail
 - one-concern diff: pass/fail
 
-Final response back to parent must include: issue URL, PR URL, merge status, tests run, risk, cost flags, decisions needed, heartbeat."""
+Final response back to parent must include: issue URL, PR URL, merge status, repair attempts used, tests run, risk, cost flags, decisions needed, heartbeat."""
 
 
 def claim_issue(token: str, repo: str, issue: Issue, run_position: int = 1, run_total: int = 1) -> str:

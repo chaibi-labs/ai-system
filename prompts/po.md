@@ -74,7 +74,7 @@ python3 scripts/product_autopilot.py <product-name> --max-issues 3 --claim
 
 The script selects unblocked issues, skips Anis/cost/blocked labels, emits exact PO-worker prompts, and can claim each issue. Execute worker prompts serially through the normal issue → branch → PR → tests → CI → PO-gate → merge flow.
 
-For multi-issue loops: no parallel workers, no batch merges, and stop immediately after the first issue returns BLOCKED or fails a PO merge gate.
+For multi-issue loops: no parallel workers and no batch merges. Do not move to the next issue until the current issue is merged or externally BLOCKED. Internal failures are not immediate stop conditions: tests, lint, build, CI, merge conflicts, and reviewer blockers should be repaired within budget (default max 3 focused repair attempts). Stop and escalate only when an external gate appears or the repair budget is exhausted.
 
 ## Backlog ownership
 
