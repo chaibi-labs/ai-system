@@ -1,0 +1,49 @@
+name: product-autopilot
+description: Conservative one-issue-at-a-time autopilot for an assigned product PO.
+trigger: "Vega or Anis requests autopilot for a product"
+
+principles:
+  - one issue per run
+  - no cost, secrets, provider setup, release, branch-protection, or product-direction decisions without Anis
+  - use normal GitHub issue/branch/PR/CI flow
+  - merge only through the assigned Product Owner token after PO gates pass
+  - stop loudly with BLOCKED instead of guessing
+
+steps:
+  - agent: po
+    task: validate repo-scoped PO credential boundary with scripts/po_github.py
+    output: validation JSON with verdict pass
+
+  - agent: po
+    task: select one unblocked issue with scripts/product_autopilot.py; prefer priority labels then age
+    output: selected issue and worker prompt
+
+  - agent: po
+    task: claim the issue with an autopilot comment
+    output: claim comment URL
+
+  - agent: po-worker
+    task: execute the worker prompt for the selected issue
+    output: PR URL, local test output, CI state, PO gate checklist
+
+  - agent: po
+    task: merge with PO token if all PO merge gates pass; otherwise comment with failed gate and return BLOCKED
+    output: merged PR or BLOCKED gate
+
+hard_stops:
+  - cost or paid quota
+  - API tokens, OAuth credentials, secrets, Render/provider setup, domains, accounts
+  - privacy/legal choice
+  - product direction, brand, pricing, or launch choice
+  - public release or new exposure
+  - branch protection or merge-authority changes
+  - failing or missing CI
+  - unresolved blocker comments
+
+outputs:
+  - selected issue URL
+  - PR URL or BLOCKED reason
+  - tests run
+  - PO gate checklist
+  - merge status
+  - next unblocked issue if any
