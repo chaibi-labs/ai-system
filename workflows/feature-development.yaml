@@ -39,8 +39,12 @@ steps:
     task: address reviewer's blockers (if any) → loop back to QA → reviewer until approved
     output: approved PR
 
-  - manual: anis_merge          # Anis merges manually unless auto-merge is enabled per class
-    on: approved PR with green CI
+  - agent: po                   # assigned Product Owner merges eligible product PRs
+    task: verify PO merge gates and merge if eligible; otherwise return BLOCKED with the failed gate
+    output: merged PR or explicit BLOCKED gate
+
+  - manual: anis_merge          # fallback for unassigned products, governance PRs, or failed PO gates
+    on: approved PR with green CI that the PO cannot merge
 
 decision_gates:
   - unclear user behavior  → coder.plan asks Anis BEFORE emitting spec (task stays in Spec Needed)

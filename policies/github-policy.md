@@ -38,9 +38,34 @@ Naming: `feature/<short-kebab-description>` or `feature/issue-<N>-<short>` for t
 - Comment on PRs
 - Close issues they own (after merge)
 
+## Product Owner merge authority
+
+Each product may name exactly one Product Owner agent in `products/<name>.yaml` via
+`po_agent`. The Product Owner is repo-scoped: it may only act with merge authority
+inside the assigned product repository.
+
+The Product Owner may merge PRs for its assigned product repo only when all of
+these gates pass:
+
+- PR targets the assigned product repo and protected `main` branch.
+- PR uses the normal PR workflow from an allowed branch prefix.
+- Reviewer verdict is approve, or all reviewer blockers are explicitly resolved.
+- CI and required acceptance checks are green.
+- PR body includes summary, linked issue if applicable, tests run, risk, cost
+  flags, and decisions needed.
+- No unresolved blocker comments remain.
+- No new cost, paid service, external account, secret, privacy/legal, release,
+  publishing, branch-protection, or governance decision is introduced.
+- Diff is small and one-concern.
+
+If any gate fails, the Product Owner comments with the failed gate and does not
+merge.
+
 ## Agents may not
 
-- Merge PRs (unless `auto-merge` is explicitly enabled later by Anis for a labeled class)
+- Merge PRs, except for an assigned Product Owner merging an eligible PR in its
+  assigned product repo under the Product Owner merge gates above, or unless
+  `auto-merge` is explicitly enabled later by Anis for a labeled class.
 - Delete repositories or branches with history
 - Change branch protection rules
 - Force push to `main`
